@@ -1,0 +1,99 @@
+#!/bin/bash
+# -----------------------------------------------------------
+# script to checksum certain bytes on a device
+# and write checksum to a flat file for future checks
+# *note*: be sure to update devicelist at the bottom
+#
+# usage: herpderp /dev/sdb
+# -----------------------------------------------------------
+
+
+# -----------------------------------------------------------
+# iterative fibonacci that starts at third number in sequence
+# not recursive b/c it's incredibly slow (lol bash)
+# -----------------------------------------------------------
+fibbernacci () {
+    a=0
+    b=1
+    sum=0
+
+    while read j; do
+        sum=$((a+b))
+        a=$b
+        b=$sum
+    done < <(seq 0 "${1}")
+    echo $b
+}
+
+
+# -----------------------------------------------------------
+# get serial number of device
+# -----------------------------------------------------------
+dat_serial () {
+    serial=$(udevadm info --attribute-walk --name="${1}" | grep -m 1 "ATTRS{serial}" | cut -d '=' -f 3 | sed 's/"//g')
+    echo $serial
+}
+
+
+# -----------------------------------------------------------
+# calculate checksum of specific bytes on device
+# update entry in device list flat file
+# -----------------------------------------------------------
+herpderp () {
+    # -----------------------------------------------------------
+    # get number of 512-byte-sized blocks
+    # create a temporary file to hold the bytes read in
+    # get serial number of device
+    # -----------------------------------------------------------
+    blocksize=$(blockdev --getsz "${1}")
+    tmpfile="/tmp/"$(dd if=/dev/urandom bs=128 status=noxfer count=1 2> /dev/null | md5sum - | cut -d ' ' -f 1)
+    serial=$(dat_serial "${1}")
+
+
+    # -----------------------------------------------------------
+    # define device list file
+    # and create if it doesn't exist
+    # -----------------------------------------------------------
+    devicelist="${2}"
+    touch "${devicelist}"
+
+
+    # -----------------------------------------------------------
+    # calculate the 0th through 90th numbers in fibonacci
+    # the 90th number is the highest before integer overflow
+    # grab the first two bytes from the corresponding block
+    # calculate sha512 of the collected bytes and store
+    # -----------------------------------------------------------
+    while read j; do
+        block=$(fibbernacci $j)
+        if [[ $block -gt $blocksize ]]; then
+            checksum=$(sha512sum -b "${tmpfile}" | cut -d ' ' -f 1)
+            listed=$(grep "${serial}" "${devicelist}")
+
+            if [[ -z "${listed}" ]]; then
+                echo -e "${checksum}\t${serial}" >> "${devicelist}"
+            else
+                sed -i s/^.*"${serial}"$/"${checksum}"\\t"${serial}"/ "${devicelist}"
+            fi
+            break
+        else
+            dd if="${1}" bs=1 count=2 skip=$((512*$block)) status=noxfer >> "${tmpfile}" 2> /dev/null
+        fi
+    done < <(seq 0 90)
+    shred -zu "${tmpfile}"
+}
+
+
+# -----------------------------------------------------------
+# check for command-line argument
+# -----------------------------------------------------------
+if [ -z "${1}" ]; then
+    echo "Usage: $0 <device>"
+    exit 1
+fi
+
+devicelist="/root/anti/forensics/devices.txt"
+device=$(echo "${1}" | tr -d '[:digit:]')
+herpderp $device $devicelist
+
+exit 0
