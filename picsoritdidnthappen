@@ -1,0 +1,93 @@
+#!/bin/bash
+# -----------------------------------------------------------
+# script that generates and encrypts/compresses random files
+# then stores encrypted file in image and audio files using 
+# steghide. file is encrypted with long, random, password; 
+# but embedded into host file protected by dictionary word.
+# easy to extract, hard to crack, all for nothing (random).
+# *note*: point $wordlist at a dictionary file or whatever
+#
+# usage: picsoritdidnthappen ~/pictures/Lulz
+# -----------------------------------------------------------
+
+wordlist="/usr/share/dict/american-english-insane"
+
+# -----------------------------------------------------------
+# select a random word from $wordlist to use as passphrase
+# for encrypting embedded file into cover file
+# -----------------------------------------------------------
+pass_pls () {
+    num_words=$(wc -l "${wordlist}" | cut -d ' ' -f 1)
+    guest_word=$(($RANDOM % $num_words))
+    guest_pass=$(sed -n "${guest_word} p" "${wordlist}")
+    echo "${guest_pass/\'/}"
+}
+
+
+do_a_stego () {
+    # -----------------------------------------------------------
+    # set guest file to same filename as host file sans extension
+    # if no extension in host file, append underscore to guest
+    # -----------------------------------------------------------
+    hostfile="${1}"
+    guestfile="${hostfile%.*}"
+    if [[ ${hostfile} == ${guestfile} ]]; then
+        guestfile="${guestfile}_"
+    fi
+
+    # -----------------------------------------------------------
+    # determine file size and generate file
+    # -----------------------------------------------------------
+    hfilesize=$(stat -c%s "${hostfile}")
+    gfilesize=$(($hfilesize / 8))
+    gfilesize=$(($RANDOM % $gfilesize))
+    ((++filesize))
+    dd if=/dev/urandom of="${guestfile}" bs="${filesize}" count=1 status=noxfer conv=noerror,notruc 2> /dev/null
+
+    # -----------------------------------------------------------
+    # decide format and compress/encrypt accordingly
+    # -----------------------------------------------------------
+    random_pass=$(dd if=/dev/urandom bs=128 count=1 status=noxfer 2> /dev/null | sha512sum - | cut -f 1 -d ' ')
+    extension=$(($RANDOM % 3))
+    case "${extension}" in
+        0)
+            tempfile="${guestfile}.gpg"
+            gpg -q --yes -o "${tempfile}" --passphrase "${random_pass}" -c "${guestfile}" &> /dev/null 
+            ;;
+        1)
+            tempfile="${guestfile}.rar"
+            rar a -o+ -hp"${random_pass}" "${tempfile}" "${guestfile}" &> /dev/null 
+            ;;
+        2)
+            tempfile="${guestfile}.7z"
+            7za a -y -mhe=on -p"${random_pass}" "${tempfile}" "${guestfile}" &> /dev/null 
+            ;;
+    esac
+
+    # -----------------------------------------------------------
+    # get (dictionary) password and embed encrypted guest file
+    # -----------------------------------------------------------
+    guest_pass=$(pass_pls)
+    steghide embed -ef "${tempfile}" -cf "${hostfile}" -p "${guest_pass}" -z 1 -N -q
+    shred -n 1 -zu "${guestfile}" "${tempfile}" 2> /dev/null
+}
+
+
+main () {
+    find "${1}" -type f \( -iname "*.bmp" -o -iname "*.jpg" -o -iname "*.wav" -o -iname "*.au" \) | while read filename; do
+        do_a_stego "${filename}"
+    done
+}
+
+
+
+# -----------------------------------------------------------
+# check for command-line arguments
+# -----------------------------------------------------------
+if [[ -z "${1}" || -z "${2}" ]]; then
+    echo "Usage: $0 <directory> <iterations>"
+    exit 9001
+fi
+
+main "${1}" 
+exit 0

@@ -1,0 +1,21 @@
+#!/bin/bash
+# -----------------------------------------------------------
+# encrypts files with random passwords
+# then removes the encrypted files
+# usage: hurrdurr /usr/local/src/sid-chroot
+# -----------------------------------------------------------
+
+if [[ -z "${1}" ]]; then
+    echo "Usage: $0 <directory>"
+    exit 9001
+fi
+
+find "${1}" -type f | while read filename; do
+    rand_pass=$(dd if=/dev/urandom bs=128 count=1 status=noxfer 2> /dev/null | sha512sum - | cut -d ' ' -f 1)
+    gpg -q --yes --passphrase "${rand_pass}" -c "${filename}" 2> /dev/null 
+    while [[ ! -e "${filename}.gpg" ]]; do continue; done
+    sync && yes | rm -f "${filename}.gpg" &> /dev/null
+done 
+
+sync
+exit 0

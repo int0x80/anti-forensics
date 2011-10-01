@@ -1,10 +1,10 @@
 #!/bin/bash
 # -----------------------------------------------------------
 # script to checksum certain bytes on a device
-# and write checksum to a flat file for future checks
+# and verify checksum against a flat file from future checks
 # *note*: be sure to update $devicelist to your flat file
 #
-# usage: herpderp /dev/sdb
+# usage: derpherp /dev/sdb
 # -----------------------------------------------------------
 
 devicelist="/root/anti/forensics/devices.txt"
@@ -40,7 +40,7 @@ dat_serial () {
 # calculate checksum of specific bytes on device
 # update entry in device list flat file
 # -----------------------------------------------------------
-herpderp () {
+derpherp () {
     # -----------------------------------------------------------
     # get number of 512-byte-sized blocks
     # create a temporary file to hold the bytes read in
@@ -69,12 +69,14 @@ herpderp () {
         block=$(fibbernacci $j)
         if [[ $block -gt $blocksize ]]; then
             checksum=$(sha512sum -b "${tmpfile}" | cut -d ' ' -f 1)
-            listed=$(grep "${serial}" "${devicelist}")
+            listed=$(grep -P "${checksum}\t${serial}" "${devicelist}")
 
+            # -----------------------------------------------------------
+            # the checksum was not found in the flat file
+            # treat as hostile and fire the lazer
+            # -----------------------------------------------------------
             if [[ -z "${listed}" ]]; then
-                echo -e "${checksum}\t${serial}" >> "${devicelist}"
-            else
-                sed -i s/^.*"${serial}"$/"${checksum}"\\t"${serial}"/ "${devicelist}"
+                shoopwhoop "${1}"
             fi
             break
         else
@@ -94,6 +96,6 @@ if [ -z "${1}" ]; then
 fi
 
 device=$(echo "${1}" | tr -d "[:digit:]")
-herpderp $device $devicelist
+derpherp $device $devicelist
 
 exit 0

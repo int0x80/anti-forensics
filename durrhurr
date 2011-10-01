@@ -1,0 +1,178 @@
+#!/bin/bash
+# -----------------------------------------------------------
+# script to pollute device (via filesystem) with artifacts of
+# encrypted files, all dynamically generated.  carving device
+# will produce over 9000 encypted files with long passwords
+# and garbage content, obliterating signal:noise ratio.
+# *note*: point $wordlist at a dictionary file or whatever
+#
+# usage: durrhurr ~/umadbro/ 9001
+# -----------------------------------------------------------
+
+wordlist="/usr/share/dict/american-english-insane"
+
+# -----------------------------------------------------------
+# generate a file of random size with random bytes
+# select a format generated file and encrypt/compress 
+# shred original generated file
+# input: temp sub-directory path with filename
+# -----------------------------------------------------------
+do_a_file () {
+    filename="${1}"
+    filesize=0
+    while [[ $filesize -lt 1024 ]]; do
+        filesize=$(($RANDOM % 19999999))
+    done
+    dd if=/dev/urandom of="${filename}" bs=1 count=$filesize status=noxfer conv=notrunc,noerror 2> /dev/null
+    random_pass=$(dd if=/dev/urandom bs=128 count=1 status=noxfer 2> /dev/null | sha512sum - | cut -f 1 -d ' ')
+    extension=$(($RANDOM % 3))
+    case "${extension}" in
+        0)
+            # by default creates output file with .gpg extension
+            gpg -q --yes --passphrase "${random_pass}" -c "${filename}" &> /dev/null 
+            ;;
+        1)
+            tempfile="${filename}.rar"
+            rar a -o+ -hp"${random_pass}" "${tempfile}" "${filename}" &> /dev/null 
+            ;;
+        2)
+            tempfile="${filename}.7z"
+            7za a -y -mhe=on -p"${random_pass}" "${tempfile}" "${filename}" &> /dev/null 
+            ;;
+    esac
+    shred -n 1 -zu "${filename}"
+}
+
+
+# -----------------------------------------------------------
+# split sub-directory path into array
+# determine which subdirectory ($RANDOM % sizeof array)
+# input: full sub-directory path
+# -----------------------------------------------------------
+pick_durr () {
+    subdir_path="${1}"
+    durr=""
+    d=0
+    durrs=()
+    while true; do
+        next_dir=${subdir_path%%/*}
+        subdir_path=${subdir_path#*/}
+        durrs[$d]=${next_dir}
+        ((++d))
+
+        if [[ ${subdir_path} == ${next_dir} ]]; then
+            break;
+        fi
+    done
+
+    subdir_count=${#durrs[@]}
+    num_subdir=$(($RANDOM % $subdir_count))
+    d=0
+    while [[ $d -lt $num_subdir ]]; do
+        durr="${durr}/${durrs[$d]}"
+        ((++d))
+    done
+
+    echo ${durr}
+}
+
+
+# -----------------------------------------------------------
+# determine number of words in filename ($RANDOM % 5) + 1
+# grab random words from wordlist
+# concatenate together for filename
+# -----------------------------------------------------------
+build_filename () {
+    filename=""
+    nameword_count=0
+    num_namewords=$(($RANDOM % 5))
+    num_words=$(wc -l "${wordlist}" | cut -d ' ' -f 1)
+    ((++num_namewords))
+    ((++num_words))
+    while [[ $nameword_count -lt $num_namewords ]]; do
+        rand_line=$(($RANDOM % $num_words))
+        rand_word=$(sed -n "$rand_line p" "${wordlist}")
+        if [[ $nameword_count -eq 0 ]]; then
+            filename="${rand_word}"
+        else
+            filename="${filename}_${rand_word}"
+        fi
+        ((++nameword_count))
+    done
+
+    echo "${filename}"
+}
+
+
+# -----------------------------------------------------------
+# generate a sub-directory path
+# select number [0, 12] of sub-directories to create
+# grab $num_subdirs of random words from wordlist
+# concatenate together for sub-directory path 
+# -----------------------------------------------------------
+build_path () {
+    num_subdirs=$(($RANDOM % 13))
+    if [[ $num_subdirs -eq 0 ]]; then 
+        echo 
+        return 0
+    fi
+
+    subdir_count=0
+    subdir_path=""
+    num_words=$(wc -l "${wordlist}" | cut -d ' ' -f 1)
+    ((++num_words))
+    while [[ $subdir_count -lt $num_subdirs ]]; do
+        rand_line=$(($RANDOM % $num_words))
+        rand_word=$(sed -n "$rand_line p" "${wordlist}")
+        subdir_path="${subdir_path}/${rand_word}"
+        ((++subdir_count))
+    done
+
+    echo "${subdir_path}"
+}
+
+
+# -----------------------------------------------------------
+# build out sub-directory structure and create path
+# select number [9001, (9001 + $RANDOM)] of files to generate
+# generate filename
+# select temporary sub-directory path
+# create the encrypted/compressed file
+# repeat for specified number of iterations
+# input: working directory, number of iterations
+# -----------------------------------------------------------
+main () {                                               # main function, durr
+    num_files=0                                         # number of files to generate
+    loop_count=0                                        # count number of iterations passed
+    while [[ $loop_count -lt "${2}" ]]; do              # iterations  
+        subdurr_path=$(build_path)                      # build a sub-directory path
+        mkdir -p "${1}/${subdurr_path}"                 # create the sub-directory path
+        while [[ $num_files -lt 9001 ]]; do             # generate over 9000 files
+            num_files=$RANDOM                           # select number of files to generate
+        done                                            # end set num_files loop
+
+        while [[ $num_files -gt 0 ]]; do                # number of files
+            filename=$(build_filename)                  # create filename
+            subdurr=$(pick_durr ${subdurr_path})        # select sub-directory
+            do_a_file "${1}/${subdurr}/${filename}"     # generate the file
+            ((--num_files))                             # decrement file count
+        done                                            # end of number of files loop
+
+        ((++loop_count))                                # increment loop count
+    done                                                # end of iterations loop
+    yes | rm -rf "${1}" &> /dev/null                    # unlink encrypted files
+}                                                       # end of main function
+
+
+
+
+# -----------------------------------------------------------
+# check for command-line arguments
+# -----------------------------------------------------------
+if [[ -z "${1}" || -z "${2}" ]]; then
+    echo "Usage: $0 <directory> <iterations>"
+    exit 9001
+fi
+
+main "${1}" "${2}"
+exit 0

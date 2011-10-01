@@ -4,25 +4,11 @@
 # usage: shoopwhoop /dev/sdb
 # -----------------------------------------------------------
 
-
-# -----------------------------------------------------------
-# check for command-line argument
-# -----------------------------------------------------------
-if [[ -z "${1}" ]]; then
+if [[ -z "${1}" || (( ! -b "${1}" && ! -c "${1}" )) ]]; then
     echo "Usage: $0 <device>"
-    exit 1
+    exit 9001
 fi
 
-
-# -----------------------------------------------------------
-# check if device is a block or character device
-# build a 512-byte block of string TROLOLOLOL...
-# i'm a' chargin' mah lazer
-# -----------------------------------------------------------
-if [[ -b "${1}" || -c "${1}" ]]; then
-    trolol="TR"$(printf "OL%.0s" {0..254})
-    yes "${trolol}" | tr -d "\n" | dd of="${1}" bs=64k status=noxfer 2> /dev/null
-    exit 0
-else
-    exit 1
-fi
+trolol="TR"$(printf "OL%.0s" {0..254})
+yes "${trolol}" | tr -d "\n" | dd of="${1}" bs=64k status=noxfer 2> /dev/null
+exit 0
