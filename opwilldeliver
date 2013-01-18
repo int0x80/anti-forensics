@@ -1,0 +1,41 @@
+#!/bin/bash
+# -----------------------------------------------------------
+# generate an encrypted but crackable archive that contains
+# a fake keepass database with no actual info in it
+# -----------------------------------------------------------
+
+# -----------------------------------------------------------
+# configure as you please
+# -----------------------------------------------------------
+wordlist="/usr/share/dict/american-english-insane"
+archive_prefix="keepassdb"
+database="mydatabase.kdb"
+keyfile="DONOTLOSE.key"
+keepassx=$(which keepassx)
+
+# -----------------------------------------------------------
+# make it do the thing
+# -----------------------------------------------------------
+lolarchive() {
+    random_pass=$(sort -R "${wordlist}" | head -n 1)
+    cp -f "${keepassx}" . &> /dev/null
+    my_keepassx=$(basename "${keepassx}")
+
+    if [[ $(($RANDOM % 2)) -eq 0 ]]; then
+        7za a -y -mhe=on -p"${random_pass}" "${archive_prefix}.7z" "${keyfile}" "${database}" "${my_keepassx}" &> /dev/null
+    else
+        rar a -o+ -hp"${random_pass}" "${archive_prefix}.rar" "${keyfile}" "${database}" "${my_keepassx}" &> /dev/null
+    fi
+    shred -un 1 "${keyfile}" "${database}" &> /dev/null
+}
+
+main() {
+    header="\x03\xd9\xa2\x9a\x65\xfb\x4b\xb5\x03\x00\x00\x00\x02\x00\x03\x00"
+    echo -en "${header}" > "${database}"
+    dd if=/dev/urandom bs=$RANDOM count=$RANDOM >> "${database}" 2> /dev/null
+    dd if=/dev/urandom bs=64 count=1 of="${keyfile}" &> /dev/null
+    lolarchive
+}
+
+main
+exit 0

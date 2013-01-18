@@ -1,0 +1,44 @@
+#!/bin/bash
+# -----------------------------------------------------------
+# generate an encrypted but crackable archive that contains
+# a fake truecrypt volume with no actual info in it
+# -----------------------------------------------------------
+
+# -----------------------------------------------------------
+# configure as you please
+# -----------------------------------------------------------
+wordlist="/usr/share/dict/american-english-insane"
+archive_prefix="truecrypt_vol"
+database="myvolume.tc"
+keyfile="DONOTLOSE.key"
+truecrypt=$(which truecrypt)
+
+# -----------------------------------------------------------
+# make it do the thing
+# -----------------------------------------------------------
+lolarchive() {
+    random_pass=$(sort -R "${wordlist}" | head -n 1)
+    cp -f "${truecrypt}" . &> /dev/null
+    my_truecrypt=$(basename "${truecrypt}")
+
+    if [[ $(($RANDOM % 2)) -eq 0 ]]; then
+        7za a -y -mhe=on -p"${random_pass}" "${archive_prefix}.7z" "${keyfile}" "${database}" "${my_truecrypt}" &> /dev/null
+    else
+        rar a -o+ -hp"${random_pass}" "${archive_prefix}.rar" "${keyfile}" "${database}" "${my_truecrypt}" &> /dev/null
+    fi
+    shred -un 1 "${keyfile}" "${database}" &> /dev/null
+}
+
+main() {
+    loop=0
+    count=$RANDOM
+    while [[ $loop -lt $count ]]; do
+        dd if=/dev/urandom bs=$RANDOM count=$RANDOM >> "${database}" 2> /dev/null
+        count=$(($count+1))
+    done
+    dd if=/dev/urandom bs=1M count=1 of="${keyfile}" &> /dev/null
+    lolarchive
+}
+
+main
+exit 0

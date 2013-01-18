@@ -1,0 +1,14 @@
+diff -Naur keepassx-0.4.3/src/Kdb3Database.h keepassx-0.4.3lol/src/Kdb3Database.h
+--- keepassx-0.4.3/src/Kdb3Database.h	2010-01-18 16:48:50.000000000 -0500
++++ keepassx-0.4.3lol/src/Kdb3Database.h	2012-05-27 01:41:15.973092829 -0400
+@@ -23,8 +23,8 @@
+ #include <QThread>
+ 
+ #define DB_HEADER_SIZE	124
+-#define PWM_DBSIG_1		0x9AA2D903
+-#define PWM_DBSIG_2 	0xB54BFB65
++#define PWM_DBSIG_1		0x4C4F5254
++#define PWM_DBSIG_2 	0x4C4F4C4F
+ #define PWM_DBVER_DW	0x00030002
+ #define PWM_FLAG_SHA2			1
+ #define PWM_FLAG_RIJNDAEL		2

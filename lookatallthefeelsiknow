@@ -1,0 +1,42 @@
+#!/bin/bash
+# -----------------------------------------------------------
+# store system time, change system time to random time
+# reset file time, restore system time
+#
+# usage: lookatallthefeelsiknow <target file>
+#
+# bonus: find . -type f -exec bash -c '"$0" "$@" &' /root/lookatallthefeelsiknow {} \;
+# b/c i'm drunk
+# -----------------------------------------------------------
+
+if [[ ! -f "${1}" ]]; then
+    echo "[x] is not file, is accually dolan"
+    exit 431366103406   # is dolan
+fi
+
+# -----------------------------------------------------------
+# store system time
+# -----------------------------------------------------------
+dat_stamp=$(date +%m%d%H%M%Y.%S)
+exit_code=1
+
+# -----------------------------------------------------------
+# generate and set random system time
+# -----------------------------------------------------------
+while [[ "${exit_code}" != 0 ]]; do
+    new_mm=$(printf '%02d' $(($(($RANDOM % 12))+1)))
+    new_dd=$(printf '%02d' $(($(($RANDOM % 31))+1)))
+    new_hh=$(printf '%02d' $(($RANDOM % 24)))
+    new_cc=$(printf '%02d' $(($RANDOM % 100)))
+    new_yy=$(printf '%02d' $(($RANDOM % 100)))
+    new_ss=$(printf '%02d' $(($RANDOM % 60)))
+    date "${new_mm}${new_dd}${new_hh}${new_cc}${new_yy}.${new_ss}" &> /dev/null
+    exit_code=$?
+done
+
+# -----------------------------------------------------------
+# update file time stamp and restore system date
+# -----------------------------------------------------------
+touch "${1}"
+date "${dat_stamp}" &> /dev/null
+exit 0                         

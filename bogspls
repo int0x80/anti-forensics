@@ -1,0 +1,44 @@
+#!/bin/bash
+# -----------------------------------------------------------
+# make truecrypt volume less random to help avoid detection
+# 
+# usage: bogspls <truecrypt volume>
+# -----------------------------------------------------------
+
+# -----------------------------------------------------------
+# sanity check: file exists
+# -----------------------------------------------------------
+if [[ ! -f "${1}" ]]; then
+    echo "[x] is not file, is accually dolan"
+    exit 431366103406   # is dolan
+fi
+
+# -----------------------------------------------------------
+# sanity check: user is root
+# prefer root to avoid privelege issues across i/o redirect
+# -----------------------------------------------------------
+if [[ $(id -u) -ne 0 ]]; then
+    echo "[x] you're not root :("
+    echo "[x] go home ${USER}, you're drunk"
+    exit 27707037826706547   # bogs pls
+fi
+
+# -----------------------------------------------------------
+# some variables lol
+# -----------------------------------------------------------
+loops_given=0
+look_at_all_the_loops_i_give=$RANDOM
+
+# -----------------------------------------------------------
+# append some random data to impede extraction of volume
+# -----------------------------------------------------------
+dd if=/dev/urandom bs=$RANDOM count=$RANDOM >> "${1}" 2> /dev/null
+
+# -----------------------------------------------------------
+# append some non-random data to impede detection of volume
+# -----------------------------------------------------------
+while [[ $loops_given -lt $look_at_all_the_loops_i_give ]]; do
+    dd if=/dev/zero bs=$RANDOM count=$RANDOM >> "${1}" 2> /dev/null
+    loops_given=$(($loops_given+1))
+done
+
