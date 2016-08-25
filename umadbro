@@ -34,7 +34,7 @@ main() {
     count=$RANDOM
     while [[ $loop -lt $count ]]; do
         dd if=/dev/urandom bs=$RANDOM count=$RANDOM >> "${database}" 2> /dev/null
-        count=$(($count+1))
+        count=$(($count-1))
     done
     dd if=/dev/urandom bs=1M count=1 of="${keyfile}" &> /dev/null
     lolarchive
